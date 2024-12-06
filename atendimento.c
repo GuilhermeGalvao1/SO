@@ -25,6 +25,7 @@ Cliente fila[MAX_FILA];
 int fila_in = 0, fila_out = 0;
 int total_clientes = 0, clientes_satisfeitos = 0;
 int tempo_inicial, flag_parar = 0;
+int contador_atendimentos = 0;
 
 // Threads
 void *thread_recepcao(void *arg);
@@ -44,7 +45,18 @@ int main(int argc, char *argv[])
 
     // Inicialização dos semáforos
     sem_atend = sem_open("/sem_atend", O_CREAT | O_EXCL, 0644, 1);
+    if (sem_atend == SEM_FAILED)
+    {
+        sem_unlink("/sem_atend");
+        sem_atend = sem_open("/sem_atend", O_CREAT | O_EXCL, 0644, 1);
+    }
+
     sem_block = sem_open("/sem_block", O_CREAT | O_EXCL, 0644, 1);
+    if (sem_block == SEM_FAILED)
+    {
+        sem_unlink("/sem_block");
+        sem_block = sem_open("/sem_block", O_CREAT | O_EXCL, 0644, 1);
+    }
 
     // Registro do tempo inicial
     tempo_inicial = time(NULL);
@@ -68,8 +80,6 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-// (Implementações adicionais aqui...)
 
 void *thread_recepcao(void *arg)
 {
@@ -115,6 +125,8 @@ void *thread_recepcao(void *arg)
 
         clientes_gerados++;
 
+        printf("Cliente gerado. PID: %d\n", pid);
+
         if (N == 0 && flag_parar)
             break;
     }
@@ -142,7 +154,15 @@ void *thread_atendente(void *arg)
         sem_post(sem_block);
 
         // Acordar cliente
-        kill(cliente.pid, SIGCONT);
+        if (kill(cliente.pid, 0) == 0) // Verifica se o processo existe
+        {
+            kill(cliente.pid, SIGCONT);
+        }
+        else
+        {
+            printf("Cliente PID %d já não existe.\n", cliente.pid);
+        }
+
         sem_wait(sem_atend);
 
         // Calcular satisfação
@@ -163,7 +183,22 @@ void *thread_atendente(void *arg)
 
         fila_out++;
 
-        // Acordar Analista
+        // Incrementar contador de atendimentos
+        contador_atendimentos++;
+
+        printf("Atendendo cliente. PID: %d, Prioridade: %d\n",
+               cliente.pid, cliente.prioridade);
+
+        // Acordar Analista a cada 10 atendimentos
+        if (contador_atendimentos % 10 == 0)
+        {
+            system("./analista &");
+        }
+    }
+
+    // Caso reste algum cliente não impresso, acionar analista
+    if (contador_atendimentos % 10 != 0)
+    {
         system("./analista &");
     }
 
