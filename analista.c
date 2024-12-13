@@ -22,7 +22,7 @@ int main()
         return 1; // file can't be opened
     }
 
-    raise(SIGSTOP); // critital region - is it necessary do raise SIGSTOP?
+    // raise(SIGSTOP); // critital region - not needed; o uso do semáfora garante exclusão mútua
 
     int count = 0;
     int pid;
@@ -32,10 +32,18 @@ int main()
         count++;
     }
 
+    fclose(lng);
+
     // Truncar arquivo após imprimir
-    fclose(lng);
     lng = fopen("lista_numeros_gerados.txt", "w");
-    fclose(lng);
+    if (lng != NULL)
+    {
+        fclose(lng);
+    }
+    else
+    {
+        perror("Erro ao truncar arquivo");
+    }
 
     sem_post(sem_block);
 

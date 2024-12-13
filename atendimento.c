@@ -22,9 +22,12 @@ typedef struct
 sem_t *sem_atend;
 sem_t *sem_block;
 Cliente fila[MAX_FILA];
-int fila_in = 0, fila_out = 0;
-int total_clientes = 0, clientes_satisfeitos = 0;
-int tempo_inicial, flag_parar = 0;
+int fila_in = 0;
+int fila_out = 0;
+int total_clientes = 0;
+int clientes_satisfeitos = 0;
+int tempo_inicial = 0;
+int flag_parar = 0;
 int contador_atendimentos = 0;
 
 // Threads
@@ -84,7 +87,7 @@ int main(int argc, char *argv[])
 void *thread_recepcao(void *arg)
 {
     int N = *(int *)arg;
-    int clientes_gerados = 0;
+    int clientes_gerados = 0; // TEM ERRO?
 
     while (1)
     {
@@ -93,6 +96,8 @@ void *thread_recepcao(void *arg)
             break;
 
         // Verificar limite da fila
+        printf("Fila atual: In=%d, Out=%d\n", fila_in, fila_out);
+
         if (fila_in - fila_out >= MAX_FILA)
         {
             usleep(100000); // Espera se fila estiver cheia
@@ -110,6 +115,13 @@ void *thread_recepcao(void *arg)
         // Configurar cliente na fila
         sem_wait(sem_block);
         FILE *demanda = fopen("demanda.txt", "r");
+        if (demanda == NULL)
+        {
+            perror("Erro ao abrir demanda.txt");
+            sem_post(sem_block);
+            return NULL;
+        }
+
         int tempo_atendimento;
         fscanf(demanda, "%d", &tempo_atendimento);
         fclose(demanda);
@@ -140,9 +152,12 @@ void *thread_atendente(void *arg)
 
     while (1)
     {
+        printf("Fila atual: In=%d, Out=%d\n", fila_in, fila_out);
+
         // Verificar se há clientes na fila
         if (fila_in == fila_out)
         {
+            printf("Todos os clientes atendidos, parando.\n");
             if (flag_parar)
                 break;
             usleep(100000);
@@ -151,7 +166,9 @@ void *thread_atendente(void *arg)
 
         sem_wait(sem_block);
         Cliente cliente = fila[fila_out % MAX_FILA];
+        fila_out++; // Atualizar o ponteiro de saída da fila
         sem_post(sem_block);
+        printf("Cliente removido da fila. In=%d, Out=%d\n", fila_in, fila_out);
 
         // Acordar cliente
         if (kill(cliente.pid, 0) == 0) // Verifica se o processo existe
@@ -161,6 +178,7 @@ void *thread_atendente(void *arg)
         else
         {
             printf("Cliente PID %d já não existe.\n", cliente.pid);
+            continue;
         }
 
         sem_wait(sem_atend);
@@ -181,7 +199,7 @@ void *thread_atendente(void *arg)
         fclose(lng);
         sem_post(sem_block);
 
-        fila_out++;
+        // fila_out++; // não fazer executar essa linha 2 vezes
 
         // Incrementar contador de atendimentos
         contador_atendimentos++;
